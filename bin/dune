@@ -1,0 +1,4 @@
+(executable
+ (public_name mexpr)
+ (name main)
+ (libraries mexpr))
