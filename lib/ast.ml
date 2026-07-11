@@ -1,4 +1,4 @@
-type binop = Add | Sub | Mul | Div | Eq | Lt 
+type binop = Add | Sub | Mul | Div | Eq | Lt | Gt
 
 type expr =
   | Int of int
