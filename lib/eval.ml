@@ -28,6 +28,10 @@ let rec step (expr, s_table) = match expr with
   | Binop (op, e1, e2) when is_val e1 -> let (e2', s_table') = step (e2, s_table) in Binop (op, e1, e2'), s_table' 
   | Binop (op, e1, e2) -> let (e1', s_table') = step (e1, s_table) in Binop (op, e1', e2), s_table'
   | Let (x, e1, e2) -> e2, (STable.add x e1 s_table)
+  | If (Bool true, e2, _) -> (e2, s_table)
+  | If (Bool false, _, e3) -> (e3, s_table)
+  | If (Int _, _, _) -> failwith "Non boolean condition."
+  | If (e1, e2, e3) -> let (e1', s_table') = step (e1, s_table) in (If (e1', e2, e3), s_table') 
 
 let rec eval (expr, s_table) =
   if is_val expr then expr, s_table else (expr, s_table) |> step |> eval
