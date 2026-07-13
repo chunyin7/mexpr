@@ -19,8 +19,9 @@ type token =
   | EOF
 
 let is_digit c = c >= '0' && c <= '9'
-
 let is_letter c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c = '_'
+let is_alpha c = is_digit c || is_letter c
+let is_whitespace = function ' ' | '\t' | '\n' | '\r' -> true | _ -> false
 
 let str_to_tok = function
   | "" -> EOF
@@ -47,10 +48,36 @@ let str_to_tok = function
       IDENT value
   | value -> invalid_arg ("invalid token: " ^ value)
 
-let rec lex_loop src start cur toks =
-  if src.[cur] = ' ' then lex_loop src (cur + 1) (cur + 1) (str_to_tok (String.sub src start (cur - start)) :: toks)
-  else lex_loop src start (cur + 1) toks
-
 let lex src =
   let len = String.length src in
-  ()
+
+  let rec consume_while cur pred =
+    if cur < len && pred src.[cur] then consume_while (cur + 1) pred else cur
+  in
+
+  let rec loop cur toks =
+    if cur = len then List.rev toks
+    else
+      match src.[cur] with
+      | c when is_whitespace c -> loop (cur + 1) toks
+      | c when is_digit c ->
+          let next = consume_while (cur + 1) is_digit in
+          let strval = String.sub src cur next in
+          loop next (INT (int_of_string strval) :: toks)
+      | c when is_letter c ->
+          let next = consume_while (cur + 1) is_alpha in
+          let ident = String.sub src cur next in
+          loop next (IDENT ident :: toks)
+      | '+' -> loop (cur + 1) (PLUS :: toks)
+      | '-' -> loop (cur + 1) (MINUS :: toks)
+      | '*' -> loop (cur + 1) (TIMES :: toks)
+      | '/' -> loop (cur + 1) (DIVIDE :: toks)
+      | '=' -> loop (cur + 1) (EQUAL :: toks)
+      | '<' -> loop (cur + 1) (LESS :: toks)
+      | '>' -> loop (cur + 1) (GREATER :: toks)
+      | '(' -> loop (cur + 1) (LPAREN :: toks)
+      | ')' -> loop (cur + 1) (RPAREN :: toks)
+      | c ->
+          invalid_arg (Printf.sprintf "invalid character %C at offset %d" c cur)
+  in
+  loop 0 []
