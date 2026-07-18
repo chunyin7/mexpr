@@ -16,6 +16,7 @@ type token =
   | ELSE
   | LPAREN
   | RPAREN
+  | BANG
   | EOF
 
 let is_digit c = c >= '0' && c <= '9'
@@ -48,6 +49,16 @@ let str_to_tok = function
       IDENT value
   | value -> invalid_arg ("invalid token: " ^ value)
 
+let word_to_tok = function
+  | "let" -> LET
+  | "in" -> IN
+  | "if" -> IF
+  | "then" -> THEN
+  | "else" -> ELSE
+  | "true" -> BOOL true
+  | "false" -> BOOL false
+  | value -> IDENT value
+
 let lex src =
   let len = String.length src in
 
@@ -56,7 +67,7 @@ let lex src =
   in
 
   let rec loop cur toks =
-    if cur = len then List.rev toks
+    if cur = len then List.rev (EOF :: toks)
     else
       match src.[cur] with
       | c when is_whitespace c -> loop (cur + 1) toks
@@ -66,8 +77,8 @@ let lex src =
           loop next (INT (int_of_string strval) :: toks)
       | c when is_letter c ->
           let next = consume_while (cur + 1) is_alpha in
-          let ident = String.sub src cur next in
-          loop next (IDENT ident :: toks)
+          let word = String.sub src cur next in
+          loop next (word_to_tok word :: toks)
       | '+' -> loop (cur + 1) (PLUS :: toks)
       | '-' -> loop (cur + 1) (MINUS :: toks)
       | '*' -> loop (cur + 1) (TIMES :: toks)
@@ -77,6 +88,7 @@ let lex src =
       | '>' -> loop (cur + 1) (GREATER :: toks)
       | '(' -> loop (cur + 1) (LPAREN :: toks)
       | ')' -> loop (cur + 1) (RPAREN :: toks)
+      | '!' -> loop (cur + 1) (BANG :: toks)
       | c ->
           invalid_arg (Printf.sprintf "invalid character %C at offset %d" c cur)
   in

@@ -15,6 +15,12 @@ let eval_binop binop e1 e2 =
   | Gt, Int a, Int b -> Bool (a > b)
   | _ -> failwith "Binary operator and operand mismatch."
 
+let eval_unop unop e =
+  match (unop, e) with
+  | Neg, Int i -> Int (-i)
+  | BNeg, Bool b -> Bool (not b)
+  | _ -> failwith "Unary operator and operand mismatch."
+
 let rec step (expr, s_table) =
   match expr with
   | Int _ | Bool _ -> failwith "Does not step eval"
@@ -33,6 +39,10 @@ let rec step (expr, s_table) =
   | Binop (op, e1, e2) ->
       let e1', s_table' = step (e1, s_table) in
       (Binop (op, e1', e2), s_table')
+  | Unop (op, e) when is_val e -> (eval_unop op e, s_table)
+  | Unop (op, e) ->
+      let e', s_table' = step (e, s_table) in
+      (Unop (op, e'), s_table')
   | Let (x, e1, e2) -> (e2, STable.add x e1 s_table)
   | If (Bool true, e2, _) -> (e2, s_table)
   | If (Bool false, _, e3) -> (e3, s_table)
