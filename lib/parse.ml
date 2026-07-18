@@ -18,83 +18,89 @@ let tok_to_unop = function
   | MINUS -> Neg
   | _ -> invalid_arg "Mismatched token type, expected unary operator."
 
-let rec primary toks cur =
-  let tok = List.nth toks cur in
-  match tok with
-  | BOOL b -> (Bool b, cur + 1)
-  | INT i -> (Int i, cur + 1)
-  | IDENT x -> (Var x, cur + 1)
-  | LPAREN ->
-      let e, cur' = expression toks (cur + 1) in
-      if List.nth toks cur' = RPAREN then (e, cur' + 1)
-      else failwith "Expected ')' after expression."
+let unwrap_head = function
+  | hd :: tl -> (hd, tl)
+  | _ -> failwith "Unexpected eof."
+
+let rec primary toks =
+  let hd, tl = unwrap_head toks in
+  match hd with
+  | BOOL b -> (Bool b, tl)
+  | INT i -> (Int i, tl)
+  | IDENT x -> (Var x, tl)
+  | LPAREN -> (
+      let e, tl' = expression tl in
+      match tl' with
+      | hd' :: tl'' when hd' = RPAREN -> (e, tl'')
+      | _ -> failwith "Expected ')' after expression.")
   | _ -> failwith "Unexpected token."
 
-and unary toks cur =
-  let tok = List.nth toks cur in
-  match tok with
+and unary toks =
+  let hd, tl = unwrap_head toks in
+  match hd with
   | BANG | MINUS ->
-      let right, cur' = unary toks (cur + 1) in
-      (Unop (tok_to_unop tok, right), cur')
-  | _ -> primary toks cur
+      let right, tl' = unary tl in
+      (Unop (tok_to_unop hd, right), tl')
+  | _ -> primary toks
 
-and factor toks cur =
-  let e, cur' = unary toks cur in
+and factor toks =
+  let e, toks' = unary toks in
 
-  let rec loop cur expr =
-    if cur >= List.length toks then (expr, cur)
-    else
-      let tok = List.nth toks cur in
-      match tok with
-      | TIMES | DIVIDE ->
-          let right, cur' = unary toks (cur + 1) in
-          loop cur' (Binop (tok_to_binop tok, expr, right))
-      | _ -> (expr, cur)
+  let rec loop toks expr =
+    match toks with
+    | hd :: tl -> (
+        match hd with
+        | TIMES | DIVIDE ->
+            let right, tl' = unary tl in
+            loop tl' (Binop (tok_to_binop hd, expr, right))
+        | _ -> (expr, toks))
+    | _ -> (expr, toks)
   in
-  loop cur' e
+  loop toks' e
 
-and term toks cur =
-  let e, cur' = factor toks cur in
+and term toks =
+  let e, toks' = factor toks in
 
-  let rec loop cur expr =
-    if cur >= List.length toks then (expr, cur)
-    else
-      let tok = List.nth toks cur in
-      match tok with
-      | MINUS | PLUS ->
-          let right, cur' = factor toks (cur + 1) in
-          loop cur' (Binop (tok_to_binop tok, expr, right))
-      | _ -> (expr, cur)
+  let rec loop toks expr =
+    match toks with
+    | hd :: tl -> (
+        match hd with
+        | MINUS | PLUS ->
+            let right, tl' = factor tl in
+            loop tl' (Binop (tok_to_binop hd, expr, right))
+        | _ -> (expr, toks))
+    | _ -> (expr, toks)
   in
-  loop cur' e
+  loop toks' e
 
-and comparison toks cur =
-  let e, cur' = term toks cur in
+and comparison toks =
+  let e, toks' = term toks in
 
-  let rec loop cur expr =
-    if cur >= List.length toks then (expr, cur)
-    else
-      let tok = List.nth toks cur in
-      match tok with
-      | GREATER | LESS ->
-          let right, cur' = term toks (cur + 1) in
-          loop cur' (Binop (tok_to_binop tok, expr, right))
-      | _ -> (expr, cur)
+  let rec loop toks expr =
+    match toks with
+    | hd :: tl -> (
+        match hd with
+        | GREATER | LESS ->
+            let right, tl' = term toks in
+            loop tl' (Binop (tok_to_binop hd, expr, right))
+        | _ -> (expr, toks))
+    | _ -> (expr, toks)
   in
-  loop cur' e
+  loop toks' e
 
-and equality toks cur =
-  let e, cur' = comparison toks cur in
+and equality toks =
+  let e, toks' = comparison toks in
 
-  let rec loop cur expr =
-    if cur >= List.length toks then (expr, cur)
-    else
-      match List.nth toks cur with
-      | EQUAL ->
-          let right, cur' = comparison toks (cur + 1) in
-          loop cur' (Binop (Eq, expr, right))
-      | _ -> (expr, cur)
+  let rec loop toks expr =
+    match toks with
+    | hd :: tl -> (
+        match hd with
+        | EQUAL ->
+            let right, tl' = comparison tl in
+            loop tl' (Binop (tok_to_binop hd, expr, right))
+        | _ -> (expr, toks))
+    | _ -> (expr, toks)
   in
-  loop cur' e
+  loop toks' e
 
-and expression toks cur = equality toks cur
+and expression toks = equality toks
