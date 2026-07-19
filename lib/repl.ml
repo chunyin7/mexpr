@@ -4,6 +4,16 @@ let print_result = function
   | Ast.Unit -> print_string "()"
   | _ -> failwith "Unexpected eval result."
 
+let handle_line raw =
+  try
+    raw |> Lex.lex |> Parse.parse
+    |> List.iter (fun ast ->
+        let result, _ = Eval.eval (ast, Eval.STable.empty) in
+        print_result result;
+        print_newline ())
+  with Failure message | Invalid_argument message ->
+    Printf.eprintf "Error: %s\n%!" message
+
 let rec repl unit =
   print_string "> ";
   flush stdout;
@@ -15,20 +25,5 @@ let rec repl unit =
       match line with
       | ":q" -> print_endline "\nExited."
       | "" -> repl ()
-      | raw ->
-          let asts = raw |> Lex.lex |> Parse.parse in
-
-          let rec loop = function
-            | hd :: tl -> (
-                try
-                  let result, _ = Eval.eval (hd, Eval.STable.empty) in
-                  print_result result;
-                  print_newline ()
-                with Failure message ->
-                  Printf.eprintf "Evaluation error: %s\n" message;
-                  repl ())
-            | _ -> ()
-          in
-
-          loop asts;
-          repl ())
+      | raw -> handle_line raw;
+        repl ())
