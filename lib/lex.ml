@@ -73,11 +73,11 @@ let lex src =
       | c when is_whitespace c -> loop (cur + 1) toks
       | c when is_digit c ->
           let next = consume_while (cur + 1) is_digit in
-          let strval = String.sub src cur next in
+          let strval = String.sub src cur (next - cur) in
           loop next (INT (int_of_string strval) :: toks)
       | c when is_letter c ->
           let next = consume_while (cur + 1) is_alpha in
-          let word = String.sub src cur next in
+          let word = String.sub src cur (next - cur) in
           loop next (word_to_tok word :: toks)
       | '+' -> loop (cur + 1) (PLUS :: toks)
       | '-' -> loop (cur + 1) (MINUS :: toks)

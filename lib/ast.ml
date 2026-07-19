@@ -1,8 +1,8 @@
 type binop = Add | Sub | Mul | Div | Eq | Lt | Gt
-
 type unop = BNeg | Neg
 
 type expr =
+  | Unit
   | Int of int
   | Bool of bool
   | Var of string

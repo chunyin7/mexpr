@@ -6,7 +6,8 @@ let empty_env = Eval.STable.empty
 let expect_eval name expected expression =
   let actual, _ = Eval.eval (expression, empty_env) in
   if actual <> expected then
-    failwith (Printf.sprintf "%s: expression evaluated to an unexpected value" name)
+    failwith
+      (Printf.sprintf "%s: expression evaluated to an unexpected value" name)
 
 let expect_token name expected lexeme =
   let actual = Lex.str_to_tok lexeme in
@@ -17,6 +18,22 @@ let expect_invalid_token lexeme =
   match Lex.str_to_tok lexeme with
   | _ -> failwith (Printf.sprintf "%S should not be a valid token" lexeme)
   | exception Invalid_argument _ -> ()
+
+let parse_one name source =
+  match Parse.parse (Lex.lex source) with
+  | [ expression ] -> expression
+  | _ ->
+      failwith
+        (Printf.sprintf "%s: source did not parse to exactly one expression"
+           name)
+
+let expect_parse name expected source =
+  let actual = parse_one name source in
+  if actual <> expected then
+    failwith (Printf.sprintf "%s: source produced an unexpected AST" name)
+
+let expect_source_eval name expected source =
+  expect_eval name expected (parse_one name source)
 
 let () =
   List.iter
@@ -56,7 +73,20 @@ let () =
     (Let
        ( "x",
          Int 10,
-         Let
-           ( "y",
-             Binop (Add, Var "x", Int 5),
-             Binop (Mul, Var "y", Int 2) ) ))
+         Let ("y", Binop (Add, Var "x", Int 5), Binop (Mul, Var "y", Int 2)) ));
+  expect_parse "operator precedence"
+    (Binop (Add, Int 1, Binop (Mul, Int 2, Int 3)))
+    "1 + 2 * 3";
+  expect_parse "nested let initializer"
+    (Let ("x", Let ("y", Int 2, Binop (Add, Var "y", Int 1)), Var "x"))
+    "let x = let y = 2 in y + 1 in x";
+  expect_parse "expression as conditional condition"
+    (If (Let ("x", Int 2, Binop (Gt, Var "x", Int 1)), Int 3, Int 4))
+    "if let x = 2 in x > 1 then 3 else 4";
+  expect_parse "conditional without else"
+    (If (Bool false, Int 1, Unit))
+    "if false then 1";
+  expect_source_eval "parsed conditional evaluation" (Int 10)
+    "let x = 5 in if x > 3 then x * 2 else 0";
+  expect_source_eval "parsed conditional without else evaluation" Unit
+    "if false then 1"

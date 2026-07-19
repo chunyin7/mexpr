@@ -1,8 +1,6 @@
 open Lex
 open Ast
 
-let parse toks = ()
-
 let tok_to_binop = function
   | EQUAL -> Eq
   | LESS -> Lt
@@ -81,7 +79,7 @@ and comparison toks =
     | hd :: tl -> (
         match hd with
         | GREATER | LESS ->
-            let right, tl' = term toks in
+            let right, tl' = term tl in
             loop tl' (Binop (tok_to_binop hd, expr, right))
         | _ -> (expr, toks))
     | _ -> (expr, toks)
@@ -103,4 +101,44 @@ and equality toks =
   in
   loop toks' e
 
-and expression toks = equality toks
+and conditional toks =
+  match toks with
+  | hd :: tl when hd = IF -> (
+      let e1, tl = expression tl in
+      match tl with
+      | hd :: tl when hd = THEN -> (
+          let e2, tl = expression tl in
+          match tl with
+          | hd :: tl when hd = ELSE ->
+              let e3, tl = expression tl in
+              (If (e1, e2, e3), tl)
+          | _ -> (If (e1, e2, Unit), tl))
+      | _ -> failwith "Expected 'then' after conditional.")
+  | _ -> equality toks
+
+and bind toks =
+  match toks with
+  | a :: b :: c :: d -> (
+      match (a, b, c) with
+      | LET, IDENT x, EQUAL -> (
+          let expr, d' = expression d in
+          match d' with
+          | hd :: tl when hd = IN ->
+              let expr', tl' = bind tl in
+              (Let (x, expr, expr'), tl')
+          | _ -> failwith "Expected 'in' for let expr.")
+      | _ -> conditional toks)
+  | _ -> conditional toks
+
+and expression toks = bind toks
+
+let parse toks =
+  let rec loop toks asts =
+    match toks with
+    | hd :: _ when hd = EOF -> List.rev asts
+    | [] -> List.rev asts
+    | _ ->
+        let ast, toks' = expression toks in
+        loop toks' (ast :: asts)
+  in
+  loop toks []
