@@ -1,7 +1,7 @@
 open Ast
 module STable = Map.Make (String)
 
-let is_val = function Int _ | Bool _ | Unit -> true | _ -> false
+let is_val = function Int _ | Bool _ | Fun _ | Unit -> true | _ -> false
 let unwrap_var expr = ()
 
 let eval_binop binop e1 e2 =
@@ -23,7 +23,7 @@ let eval_unop unop e =
 
 let rec step (expr, s_table) =
   match expr with
-  | Int _ | Bool _ | Unit -> failwith "Does not step eval"
+  | Int _ | Bool _ | Fun _ | Unit -> failwith "Does not step eval"
   | Var x -> (
       match STable.find_opt x s_table with
       | Some e when is_val e -> (e, s_table)
@@ -50,6 +50,16 @@ let rec step (expr, s_table) =
   | If (e1, e2, e3) ->
       let e1', s_table' = step (e1, s_table) in
       (If (e1', e2, e3), s_table')
+  | Apply (f, e) when is_val f ->
+      let res =
+        match f with
+        | Fun (x, body) -> step (body, STable.add x e s_table)
+        | _ -> failwith "Applying non-function expression."
+      in
+      res
+  | Apply (f, e) ->
+      let f', s_table' = step (f, s_table) in
+      (Apply (f', e), s_table')
 
 let rec eval (expr, s_table) =
   if is_val expr then (expr, s_table) else (expr, s_table) |> step |> eval

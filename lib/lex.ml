@@ -18,6 +18,8 @@ type token =
   | RPAREN
   | BANG
   | EOF
+  | FUN
+  | ARROW
 
 let is_digit c = c >= '0' && c <= '9'
 let is_letter c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c = '_'
@@ -57,6 +59,7 @@ let word_to_tok = function
   | "else" -> ELSE
   | "true" -> BOOL true
   | "false" -> BOOL false
+  | "fun" -> FUN
   | value -> IDENT value
 
 let lex src =
@@ -80,6 +83,8 @@ let lex src =
           let word = String.sub src cur (next - cur) in
           loop next (word_to_tok word :: toks)
       | '+' -> loop (cur + 1) (PLUS :: toks)
+      | '-' when cur + 1 < len && src.[cur + 1] = '>' ->
+          loop (cur + 2) (ARROW :: toks)
       | '-' -> loop (cur + 1) (MINUS :: toks)
       | '*' -> loop (cur + 1) (TIMES :: toks)
       | '/' -> loop (cur + 1) (DIVIDE :: toks)

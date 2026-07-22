@@ -33,13 +33,26 @@ let rec primary toks =
       | _ -> failwith "Expected ')' after expression.")
   | _ -> failwith "Unexpected token."
 
+and application toks =
+  let f, toks' = primary toks in
+
+  let rec loop fn toks =
+    match toks with
+    | (BOOL _ | INT _ | IDENT _ | LPAREN) :: _ ->
+        let arg, toks' = primary toks in
+        loop (Apply (fn, arg)) toks'
+    | _ -> (fn, toks)
+  in
+
+  loop f toks'
+
 and unary toks =
   let hd, tl = unwrap_head toks in
   match hd with
   | BANG | MINUS ->
       let right, tl' = unary tl in
       (Unop (tok_to_unop hd, right), tl')
-  | _ -> primary toks
+  | _ -> application toks
 
 and factor toks =
   let e, toks' = unary toks in
@@ -116,19 +129,23 @@ and conditional toks =
       | _ -> failwith "Expected 'then' after conditional.")
   | _ -> equality toks
 
+and func toks =
+  match toks with
+  | FUN :: IDENT x :: ARROW :: d ->
+      let e, tl = expression d in
+      (Fun (x, e), tl)
+  | _ -> conditional toks
+
 and bind toks =
   match toks with
-  | a :: b :: c :: d -> (
-      match (a, b, c) with
-      | LET, IDENT x, EQUAL -> (
-          let expr, d' = expression d in
-          match d' with
-          | hd :: tl when hd = IN ->
-              let expr', tl' = bind tl in
-              (Let (x, expr, expr'), tl')
-          | _ -> failwith "Expected 'in' for let expr.")
-      | _ -> conditional toks)
-  | _ -> conditional toks
+  | LET :: IDENT x :: EQUAL :: d -> (
+      let expr, d' = expression d in
+      match d' with
+      | hd :: tl when hd = IN ->
+          let expr', tl' = bind tl in
+          (Let (x, expr, expr'), tl')
+      | _ -> failwith "Expected 'in' for let expr.")
+  | _ -> func toks
 
 and expression toks = bind toks
 
