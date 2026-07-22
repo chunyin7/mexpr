@@ -16,20 +16,15 @@ let tok_to_unop = function
   | MINUS -> Neg
   | _ -> invalid_arg "Mismatched token type, expected unary operator."
 
-let unwrap_head = function
-  | hd :: tl -> (hd, tl)
-  | _ -> failwith "Unexpected eof."
-
 let rec primary toks =
-  let hd, tl = unwrap_head toks in
-  match hd with
-  | BOOL b -> (Bool b, tl)
-  | INT i -> (Int i, tl)
-  | IDENT x -> (Var x, tl)
-  | LPAREN -> (
+  match toks with
+  | BOOL b :: tl -> (Bool b, tl)
+  | INT i :: tl -> (Int i, tl)
+  | IDENT x :: tl -> (Var x, tl)
+  | LPAREN :: tl -> (
       let e, tl' = expression tl in
       match tl' with
-      | hd' :: tl'' when hd' = RPAREN -> (e, tl'')
+      | RPAREN :: tl'' -> (e, tl'')
       | _ -> failwith "Expected ')' after expression.")
   | _ -> failwith "Unexpected token."
 
@@ -47,9 +42,9 @@ and application toks =
   loop f toks'
 
 and unary toks =
-  let hd, tl = unwrap_head toks in
-  match hd with
-  | BANG | MINUS ->
+  match toks with
+  | (BANG | MINUS) :: tl ->
+      let hd = List.hd toks in
       let right, tl' = unary tl in
       (Unop (tok_to_unop hd, right), tl')
   | _ -> application toks
@@ -59,12 +54,10 @@ and factor toks =
 
   let rec loop toks expr =
     match toks with
-    | hd :: tl -> (
-        match hd with
-        | TIMES | DIVIDE ->
-            let right, tl' = unary tl in
-            loop tl' (Binop (tok_to_binop hd, expr, right))
-        | _ -> (expr, toks))
+    | (TIMES | DIVIDE) :: tl ->
+        let hd = List.hd toks in
+        let right, tl' = unary tl in
+        loop tl' (Binop (tok_to_binop hd, expr, right))
     | _ -> (expr, toks)
   in
   loop toks' e
@@ -74,12 +67,10 @@ and term toks =
 
   let rec loop toks expr =
     match toks with
-    | hd :: tl -> (
-        match hd with
-        | MINUS | PLUS ->
-            let right, tl' = factor tl in
-            loop tl' (Binop (tok_to_binop hd, expr, right))
-        | _ -> (expr, toks))
+    | (MINUS | PLUS) :: tl ->
+        let hd = List.hd toks in
+        let right, tl' = factor tl in
+        loop tl' (Binop (tok_to_binop hd, expr, right))
     | _ -> (expr, toks)
   in
   loop toks' e
@@ -89,12 +80,10 @@ and comparison toks =
 
   let rec loop toks expr =
     match toks with
-    | hd :: tl -> (
-        match hd with
-        | GREATER | LESS ->
-            let right, tl' = term tl in
-            loop tl' (Binop (tok_to_binop hd, expr, right))
-        | _ -> (expr, toks))
+    | (GREATER | LESS) :: tl ->
+        let hd = List.hd toks in
+        let right, tl' = term tl in
+        loop tl' (Binop (tok_to_binop hd, expr, right))
     | _ -> (expr, toks)
   in
   loop toks' e
@@ -104,25 +93,22 @@ and equality toks =
 
   let rec loop toks expr =
     match toks with
-    | hd :: tl -> (
-        match hd with
-        | EQUAL ->
-            let right, tl' = comparison tl in
-            loop tl' (Binop (tok_to_binop hd, expr, right))
-        | _ -> (expr, toks))
+    | EQUAL :: tl ->
+        let right, tl' = comparison tl in
+        loop tl' (Binop (Eq, expr, right))
     | _ -> (expr, toks)
   in
   loop toks' e
 
 and conditional toks =
   match toks with
-  | hd :: tl when hd = IF -> (
+  | IF :: tl -> (
       let e1, tl = expression tl in
       match tl with
-      | hd :: tl when hd = THEN -> (
+      | THEN :: tl -> (
           let e2, tl = expression tl in
           match tl with
-          | hd :: tl when hd = ELSE ->
+          | ELSE :: tl ->
               let e3, tl = expression tl in
               (If (e1, e2, e3), tl)
           | _ -> (If (e1, e2, Unit), tl))
@@ -131,17 +117,17 @@ and conditional toks =
 
 and func toks =
   match toks with
-  | FUN :: IDENT x :: ARROW :: d ->
-      let e, tl = expression d in
-      (Fun (x, e), tl)
+  | FUN :: IDENT x :: ARROW :: tl ->
+      let e, tl' = expression tl in
+      (Fun (x, e), tl')
   | _ -> conditional toks
 
 and bind toks =
   match toks with
-  | LET :: IDENT x :: EQUAL :: d -> (
-      let expr, d' = expression d in
-      match d' with
-      | hd :: tl when hd = IN ->
+  | LET :: IDENT x :: EQUAL :: tl -> (
+      let expr, tl' = expression tl in
+      match tl' with
+      | IN :: tl ->
           let expr', tl' = bind tl in
           (Let (x, expr, expr'), tl')
       | _ -> failwith "Expected 'in' for let expr.")
