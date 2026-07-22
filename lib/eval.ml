@@ -53,7 +53,7 @@ let rec step (expr, s_table) =
   | Apply (f, e) when is_val f ->
       let res =
         match f with
-        | Fun (x, body) -> step (body, STable.add x e s_table)
+        | Fun (x, body) -> (body, STable.add x e s_table)
         | _ -> failwith "Applying non-function expression."
       in
       res
