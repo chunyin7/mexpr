@@ -4,7 +4,7 @@ let print_result = function
   | Ast.Unit -> print_string "()"
   | _ -> failwith "Unexpected eval result."
 
-let handle_line raw =
+let exec raw =
   try
     raw |> Lex.lex |> Parse.parse
     |> List.iter (fun ast ->
@@ -25,5 +25,10 @@ let rec repl unit =
       match line with
       | ":q" -> print_endline "\nExited."
       | "" -> repl ()
-      | raw -> handle_line raw;
+      | raw -> exec raw;
         repl ())
+
+let run path =
+  let ic = open_in path in
+  let src = In_channel.input_all ic in
+  exec src
