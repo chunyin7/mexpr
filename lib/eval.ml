@@ -54,6 +54,11 @@ let rec eval expr env =
       let thunk = ref (Suspended (e1, env)) in
       let body_env = Env.add x thunk env in
       eval e2 body_env
+  | LetRec (x, e1, e2) ->
+    let thunk = ref Forcing in
+    let recursive_env = Env.add x thunk env in
+    thunk := Suspended (e1, recursive_env);
+    eval e2 recursive_env
   | If (e1, e2, e3) -> (
       match eval e1 env with
       | VBool true -> eval e2 env

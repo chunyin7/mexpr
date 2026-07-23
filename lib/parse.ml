@@ -131,6 +131,13 @@ and bind toks =
           let expr', tl' = bind tl in
           (Let (x, expr, expr'), tl')
       | _ -> failwith "Expected 'in' for let expr.")
+  | LET :: REC :: IDENT x :: EQUAL :: tl -> (
+      let expr, tl' = expression tl in
+      match tl' with
+      | IN :: tl'' ->
+          let body, rest = bind tl'' in
+          (LetRec (x, expr, body), rest)
+      | _ -> failwith "Expected 'in' for let expr.")
   | _ -> func toks
 
 and expression toks = bind toks

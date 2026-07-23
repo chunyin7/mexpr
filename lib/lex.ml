@@ -10,6 +10,7 @@ type token =
   | LESS
   | GREATER
   | LET
+  | REC
   | IN
   | IF
   | THEN
@@ -53,6 +54,7 @@ let str_to_tok = function
 
 let word_to_tok = function
   | "let" -> LET
+  | "rec" -> REC
   | "in" -> IN
   | "if" -> IF
   | "then" -> THEN
