@@ -1,14 +1,14 @@
 let print_result = function
-  | Ast.Int x -> print_int x
-  | Ast.Bool b -> print_string (string_of_bool b)
-  | Ast.Unit -> print_string "()"
+  | Eval.VInt x -> print_int x
+  | Eval.VBool b -> print_string (string_of_bool b)
+  | Eval.VUnit -> print_string "()"
   | _ -> failwith "Unexpected eval result."
 
 let exec raw =
   try
     raw |> Lex.lex |> Parse.parse
     |> List.iter (fun ast ->
-        let result, _ = Eval.eval (ast, Eval.STable.empty) in
+        let result = Eval.eval ast Eval.Env.empty in
         print_result result;
         print_newline ())
   with Failure message | Invalid_argument message ->
@@ -25,10 +25,10 @@ let rec repl unit =
       match line with
       | ":q" -> print_endline "\nExited."
       | "" -> repl ()
-      | raw -> exec raw;
-        repl ())
+      | raw ->
+          exec raw;
+          repl ())
 
 let run path =
-  let ic = open_in path in
-  let src = In_channel.input_all ic in
+  let src = open_in path |> In_channel.input_all in
   exec src

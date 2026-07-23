@@ -1,4 +1,5 @@
 type binop = Add | Sub | Mul | Div | Eq | Lt | Gt
+
 type unop = BNeg | Neg
 
 type expr =
