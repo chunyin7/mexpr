@@ -9,6 +9,9 @@ module IntMap = Map.Make (Int)
 (* id : type *)
 type substitution = typ IntMap.t
 
+(* t1 = t2 *)
+type constraint_ = typ * typ
+
 let empty_sub = IntMap.empty
 
 (* id generator for tvar *)
@@ -50,7 +53,11 @@ let instantiate (Forall (vars, ty)) =
   let subs = List.fold_left (fun map var -> IntMap.add var (fresh_tvar ()) map) empty_sub vars in
   apply_subs ty subs
 
-let occurs var ty = true
+let rec occurs var ty =
+  match ty with
+  | TVar a -> a = var
+  | TFun (t1, t2) -> (occurs var t1) || (occurs var t2)
+  | _ -> false
 
 let bind_tvar subs var ty =
   let ty = apply_subs ty subs in
@@ -61,7 +68,7 @@ let bind_tvar subs var ty =
     failwith "Infinite type."
   else IntMap.add var ty subs
 
-let rec unify subs t1 t2 =
+(* let rec unify subs t1 t2 =
   let t1 = apply_subs t1 subs in
   let t2 = apply_subs t2 subs in
 
@@ -72,51 +79,56 @@ let rec unify subs t1 t2 =
   | TVar a, TBool | TBool, TVar a -> IntMap.add a TBool empty_sub
   | TVar a, TUnit | TUnit, TVar a -> IntMap.add a TUnit empty_sub
   | TFun (arg1, body1), TFun (arg2, body2) ->
-    let s1 = unify arg1 arg2 in
+    let s1 = unify arg1 arg2 in *)
 
-let rec infer env = function
-  | Int _ -> empty_sub, TInt
-  | Bool _ -> empty_sub, TBool
-  | Unit -> empty_sub, TUnit
+let lookup_bop = function
+  | Add | Sub | Div | Mul -> TInt, TInt, TInt
+  | Eq | Lt | Gt -> TInt, TInt, TBool
+
+let lookup_unop = function
+  | BNeg -> TBool, TBool
+  | Neg -> TInt, TInt
+
+(* env -> e -> ty * constraints *)
+let rec infer env e = match e with
+  | Int _ -> TInt, []
+  | Bool _ -> TBool, []
+  | Unit -> TUnit, []
   | Var x ->
     let scheme = lookup env x in
     let ty = instantiate scheme in
-    empty_sub, ty
+    ty, []
   | Fun (arg, e) ->
     let a = fresh_tvar () in
     let env' = extend env arg (Forall ([], a)) in
-    let subs, body_ty = infer env' e in
-    let arg_ty = apply_subs a subs in
-    subs, TFun (arg_ty, body_ty)
+    let body_ty, constraints = infer env' e in
+    TFun (a, body_ty), constraints
   | Let (x, e1, e2) | LetRec (x, e1, e2) ->
-      let _, t1 = infer env e1 in
+      let t1, c1 = infer env e1 in
       let env' = extend env x (Forall ([], t1)) in
-      infer env' e2
-  | Binop (bop, e1, e2) -> (
-      let _, t1 = infer env e1 in
-      let _, t2 = infer env e2 in
-      match (bop, t1, t2) with
-      | Add, TInt, TInt | Mul, TInt, TInt | Div, TInt, TInt | Sub, TInt, TInt ->
-          empty_sub, TInt
-      | Eq, TInt, TInt | Lt, TInt, TInt | Gt, TInt, TInt -> empty_sub, TBool
-      | _ -> failwith "Binary operator and operand type mismatch.")
-  | Unop (op, e) -> (
-      let subs, ty = infer env e in
-      match (op, ty) with
-      | BNeg, TBool -> empty_sub, TBool
-      | Neg, TInt -> empty_sub, TInt
-      | _ -> failwith "Unary operator and operand type mismatch.")
+      let t2, c2 = infer env' e2 in
+      t2, c1 @ c2
+  | Binop (bop, e1, e2) ->
+      let l_ty, r_ty, ret_ty = lookup_bop bop in
+      let t1, c1 = infer env e1 in
+      let t2, c2 = infer env e2 in
+      let c = [(l_ty, t1); (r_ty, t1)] in
+      let constraints = c @ c1 @ c2 in
+      ret_ty, constraints
+  | Unop (op, e) ->
+      let arg_ty, ret_ty = lookup_unop op in
+      let ty, c = infer env e in
+      ret_ty, c @ [(arg_ty, ty)]
   | If (e1, e2, e3) ->
-      if infer env e1 = TBool then
-        let t2 = infer env e2 in
-        if t2 = infer env e3 then t2
-        else failwith "Branches of if must have same type."
-      else failwith "Guard of if must have type bool."
-  | Apply (f, arg) -> (
-      let s1, f_ty = infer env f in
-      let s2, arg_ty = infer env arg in
-      let arg_ty' = apply_subs arg_ty s1 in
-      match f_ty with
-      | TFun (arg, body) when arg = arg_ty' -> s2, apply_subs body s2
-      | TFun _ -> failwith "Mismatched argument types."
-      | _ -> failwith "Applying non function type.")
+      let t = fresh_tvar () in
+      let t1, c1 = infer env e1 in
+      let t2, c2 = infer env e2 in
+      let t3, c3 = infer env e3 in
+      let c = [(t1, TBool); (t2, t); (t3, t)] in
+      t, c @ c1 @ c2 @ c3
+  | Apply (e1, e2) -> (
+      let t = fresh_tvar () in
+      let t1, c1 = infer env e1 in
+      let t2, c2 = infer env e2 in
+      let c = [(t1, TFun (t2, t))] in
+      t, c @ c1 @ c2
