@@ -40,7 +40,7 @@ end
 open StaticEnvironment
 open Ast
 
-let apply_subs ty subs =
+let apply_subs subs ty =
   match ty with
   | TVar var -> (
     match IntMap.find_opt var subs with
@@ -51,7 +51,7 @@ let apply_subs ty subs =
 
 let instantiate (Forall (vars, ty)) =
   let subs = List.fold_left (fun map var -> IntMap.add var (fresh_tvar ()) map) empty_sub vars in
-  apply_subs ty subs
+  apply_subs subs ty
 
 let rec occurs var ty =
   match ty with
@@ -59,27 +59,30 @@ let rec occurs var ty =
   | TFun (t1, t2) -> (occurs var t1) || (occurs var t2)
   | _ -> false
 
-let bind_tvar subs var ty =
-  let ty = apply_subs ty subs in
+let compose s2 s1 =
+  (* apply s2 to types of s1 *)
+  let s1' = IntMap.map (apply_subs s2) s1 in
+  IntMap.union (fun _ _ t2 -> Some t2) s1' s2
 
+let bind_tvar subs var ty =
   if ty = TVar var then
     subs
   else if occurs var ty then
     failwith "Infinite type."
-  else IntMap.add var ty subs
+  else compose (IntMap.singleton var ty) subs
 
-(* let rec unify subs t1 t2 =
-  let t1 = apply_subs t1 subs in
-  let t2 = apply_subs t2 subs in
+let rec unify subs t1 t2 =
+  let t1 = apply_subs subs t1 in
+  let t2 = apply_subs subs t2 in
 
   match t1, t2 with
-  | TInt, TInt | TBool, TBool | TUnit, TUnit -> Ok subs
-  | TVar a, TVar b when a = b -> Ok subs
-  | TVar a, TInt | TInt, TVar a -> Ok (IntMap.add a TInt subs)
-  | TVar a, TBool | TBool, TVar a -> IntMap.add a TBool empty_sub
-  | TVar a, TUnit | TUnit, TVar a -> IntMap.add a TUnit empty_sub
+  | TInt, TInt | TBool, TBool | TUnit, TUnit -> subs
+  | TVar a, TVar b when a = b -> subs
+  | TVar a, t | t, TVar a when not (occurs a t)-> bind_tvar subs a t
   | TFun (arg1, body1), TFun (arg2, body2) ->
-    let s1 = unify arg1 arg2 in *)
+      let subs' = unify subs arg1 arg2 in
+      unify subs' body1 body2
+  | _ -> failwith "Invalid unification."
 
 let lookup_bop = function
   | Add | Sub | Div | Mul -> TInt, TInt, TInt
