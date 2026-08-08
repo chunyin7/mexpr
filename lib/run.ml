@@ -8,6 +8,7 @@ let exec raw =
   try
     raw |> Lex.lex |> Parse.parse
     |> List.iter (fun ast ->
+        let _t = Type.infer_and_check ast in
         let result = Eval.eval ast Eval.Env.empty in
         print_result result;
         print_newline ())
