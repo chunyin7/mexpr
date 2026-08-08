@@ -22,9 +22,11 @@ let fresh_tvar () =
   incr next_id;
   TVar id
 
-module StringMap = Map.Make (String)
+open Ast
 
 module StaticEnvironment = struct
+  module StringMap = Map.Make (String)
+
   type t = tscheme StringMap.t
 
   let empty = StringMap.empty
@@ -35,10 +37,15 @@ module StaticEnvironment = struct
     | None -> failwith "Unbound variable."
 
   let extend env x ty = StringMap.add x ty env
+
+  let lookup_bop = function
+    | Add | Sub | Div | Mul -> (TInt, TInt, TInt)
+    | Eq | Lt | Gt -> (TInt, TInt, TBool)
+
+  let lookup_unop = function BNeg -> (TBool, TBool) | Neg -> (TInt, TInt)
 end
 
 open StaticEnvironment
-open Ast
 
 let rec apply_subs subs ty =
   match ty with
@@ -87,12 +94,6 @@ let rec unify subs (t1, t2) =
       unify subs' (body1, body2)
   | _ -> failwith "Invalid unification."
 
-let lookup_bop = function
-  | Add | Sub | Div | Mul -> (TInt, TInt, TInt)
-  | Eq | Lt | Gt -> (TInt, TInt, TBool)
-
-let lookup_unop = function BNeg -> (TBool, TBool) | Neg -> (TInt, TInt)
-
 (* env -> e -> ty * constraints *)
 let rec infer env e =
   match e with
@@ -118,12 +119,12 @@ let rec infer env e =
       let env' = extend env x (Forall ([], tx)) in
       let t1, c1 = infer env' e1 in
       let t2, c2 = infer env' e2 in
-      (t2, c1 @ c2 @ [(tx, t1)])
+      (t2, c1 @ c2 @ [ (tx, t1) ])
   | Binop (bop, e1, e2) ->
       let l_ty, r_ty, ret_ty = lookup_bop bop in
       let t1, c1 = infer env e1 in
       let t2, c2 = infer env e2 in
-      let c = [ (l_ty, t1); (r_ty, t1) ] in
+      let c = [ (l_ty, t1); (r_ty, t2) ] in
       let constraints = c @ c1 @ c2 in
       (ret_ty, constraints)
   | Unop (op, e) ->

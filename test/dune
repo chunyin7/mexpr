@@ -1,3 +1,9 @@
-(test
- (name test_mexpr)
+(library
+ (name test_support)
+ (modules test_support)
  (libraries mexpr))
+
+(tests
+ (names test_lex test_parse test_eval test_type)
+ (modules test_lex test_parse test_eval test_type)
+ (libraries mexpr test_support))
