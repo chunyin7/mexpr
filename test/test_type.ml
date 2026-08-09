@@ -18,6 +18,15 @@ let expect_identity_type name source =
       ()
   | _ -> failwith (Printf.sprintf "%s: expected an identity function type" name)
 
+let expect_integer_application_type name source =
+  match infer_source name source with
+  | Type.TFun (Type.TFun (Type.TInt, Type.TVar result), Type.TVar returned)
+    when result = returned ->
+      ()
+  | _ ->
+      failwith
+        (Printf.sprintf "%s: expected an (int -> 'a) -> 'a function type" name)
+
 let () =
   expect_type "integer literal" Type.TInt "42";
   expect_type "boolean literal" Type.TBool "true";
@@ -42,5 +51,19 @@ let () =
   expect_type_failure "invalid left operand" "false + 1";
   expect_type_failure "invalid right operand" "1 + false";
   expect_type_failure "infinite self-application" "fun x -> x x";
-  expect_type_failure "monomorphic let binding"
-    "let id = fun x -> x in let number = id 1 in id true"
+  expect_type "polymorphic let binding" Type.TBool
+    "let id = fun x -> x in let number = id 1 in id true";
+  expect_identity_type "polymorphic function with captured variable"
+    "fun x -> let constant = fun y -> x in let number = constant 1 in constant \
+     true";
+  expect_integer_application_type "let binding retains inferred constraints"
+    "fun f -> let result = f 1 in result";
+  expect_type_failure "lambda argument remains monomorphic"
+    "fun f -> let number = f 1 in f true";
+  expect_type_failure "environment variable is not over-generalised"
+    "fun f -> let result = f 1 in let number = result + 1 in if result then \
+     true else false";
+  expect_type "recursive binding is polymorphic after its definition" Type.TBool
+    "let rec id = fun x -> x in let number = id 1 in id true";
+  expect_type_failure "recursive binding remains monomorphic in its definition"
+    "let rec f = fun x -> let number = f 1 in f true in f"
