@@ -21,6 +21,10 @@ type token =
   | EOF
   | FUN
   | ARROW
+  | REF
+  | MUT
+  | DEREF
+  | SEMI
 
 let is_digit c = c >= '0' && c <= '9'
 let is_letter c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c = '_'
@@ -45,6 +49,10 @@ let str_to_tok = function
   | ">" -> GREATER
   | "(" -> LPAREN
   | ")" -> RPAREN
+  | "ref" -> REF
+  | ":=" -> MUT
+  | ":" -> DEREF
+  | ";" -> SEMI
   | value when String.for_all is_digit value -> INT (int_of_string value)
   | value
     when is_letter value.[0]
@@ -62,6 +70,7 @@ let word_to_tok = function
   | "true" -> BOOL true
   | "false" -> BOOL false
   | "fun" -> FUN
+  | "ref" -> REF
   | value -> IDENT value
 
 let lex src =
@@ -88,6 +97,9 @@ let lex src =
       | '-' when cur + 1 < len && src.[cur + 1] = '>' ->
           loop (cur + 2) (ARROW :: toks)
       | '-' -> loop (cur + 1) (MINUS :: toks)
+      | ':' when cur + 1 < len && src.[cur + 1] = '=' ->
+          loop (cur + 2) (MUT :: toks)
+      | ':' -> loop (cur + 1) (DEREF :: toks)
       | '*' -> loop (cur + 1) (TIMES :: toks)
       | '/' -> loop (cur + 1) (DIVIDE :: toks)
       | '=' -> loop (cur + 1) (EQUAL :: toks)
@@ -96,6 +108,7 @@ let lex src =
       | '(' -> loop (cur + 1) (LPAREN :: toks)
       | ')' -> loop (cur + 1) (RPAREN :: toks)
       | '!' -> loop (cur + 1) (BANG :: toks)
+      | ';' -> loop (cur + 1) (SEMI :: toks)
       | c ->
           invalid_arg (Printf.sprintf "invalid character %C at offset %d" c cur)
   in

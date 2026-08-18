@@ -6,6 +6,7 @@ type value =
   | VInt of int
   | VBool of bool
   | VClosure of string * expr * env
+  | VRef of value ref
 
 and thunk_state =
   | Suspended of expr * env
@@ -38,6 +39,25 @@ let rec eval expr env =
   | Int i -> VInt i
   | Bool b -> VBool b
   | Unit -> VUnit
+  | Ref e ->
+    let v = eval e env in
+    VRef (ref v)
+  | Deref e -> (
+    match eval e env with
+    | VRef r -> !r
+    | _ -> failwith "Dereferencing a non-reference expression."
+  )
+  | Mutate (e1, e2) -> (
+    match eval e1 env with
+    | VRef r ->
+      let v = eval e2 env in
+      r := v;
+      VUnit
+    | _ -> failwith "Mutating non-reference expression."
+  )
+  | Seq (e1, e2) ->
+    ignore (eval e1 env);
+    eval e2 env
   | Fun (arg, e) -> VClosure (arg, e, env)
   | Var x -> (
       match Env.find_opt x env with

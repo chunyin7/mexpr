@@ -14,3 +14,7 @@ type expr =
   | If of expr * expr * expr (* if expr then expr else expr *)
   | Fun of string * expr (* fun x -> expr *)
   | Apply of expr * expr (* fun - val for param *)
+  | Ref of expr
+  | Deref of expr (* ref *)
+  | Mutate of expr * expr (* ref := val *)
+  | Seq of expr * expr (* e1; e2 *)

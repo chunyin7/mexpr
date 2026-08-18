@@ -16,4 +16,13 @@ let () =
     "if let x = 2 in x > 1 then 3 else 4";
   expect_parse "conditional without else"
     (If (Bool false, Int 1, Unit))
-    "if false then 1"
+    "if false then 1";
+  expect_parse "sequence in let body"
+    (Let
+       ( "x",
+         Ref (Int 1),
+         Seq (Mutate (Var "x", Int 2), Deref (Var "x")) ))
+    "let x = ref 1 in x := 2; :x";
+  expect_parse "right-associative sequence"
+    (Seq (Int 1, Seq (Int 2, Int 3)))
+    "1; 2; 3"

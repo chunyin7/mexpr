@@ -47,6 +47,12 @@ and unary toks =
       let hd = List.hd toks in
       let right, tl' = unary tl in
       (Unop (tok_to_unop hd, right), tl')
+  | DEREF :: tl ->
+    let right, tl' = unary tl in
+    (Deref right, tl')
+  | REF :: tl ->
+    let right, tl' = unary tl in
+    (Ref right, tl')
   | _ -> application toks
 
 and factor toks =
@@ -128,19 +134,37 @@ and bind toks =
       let expr, tl' = expression tl in
       match tl' with
       | IN :: tl ->
-          let expr', tl' = bind tl in
+          let expr', tl' = expression tl in
           (Let (x, expr, expr'), tl')
       | _ -> failwith "Expected 'in' for let expr.")
   | LET :: REC :: IDENT x :: EQUAL :: tl -> (
       let expr, tl' = expression tl in
       match tl' with
       | IN :: tl'' ->
-          let body, rest = bind tl'' in
+          let body, rest = expression tl'' in
           (LetRec (x, expr, body), rest)
       | _ -> failwith "Expected 'in' for let expr.")
   | _ -> func toks
 
-and expression toks = bind toks
+and mutation toks =
+  let left, toks' = bind toks in
+
+  match toks' with
+  | MUT :: tl ->
+    let right, tl' = bind tl in
+    (Mutate (left, right), tl')
+  | _ -> (left, toks')
+
+and sequence toks =
+  let left, toks' = mutation toks in
+
+  match toks' with
+  | SEMI :: tl ->
+    let right, tl' = sequence tl in
+    (Seq (left, right), tl')
+  | _ -> (left, toks')
+
+and expression toks = sequence toks
 
 let parse toks =
   let rec loop toks asts =

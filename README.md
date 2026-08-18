@@ -1,6 +1,6 @@
 # mexpr
 
-A small toy expression-language interpreter, including a hand-written lexer and parser, evaluation, functions and recursive bindings, and Hindley–Milner type inference with polymorphic `let` bindings.
+A small toy expression-language interpreter, including a hand-written lexer and parser, evaluation, functions and recursive bindings, mutable references, and Hindley–Milner type inference with polymorphic `let` bindings.
 
 ```sh
 # Start the REPL

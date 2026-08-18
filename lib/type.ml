@@ -1,5 +1,5 @@
 type tvar = int
-type typ = TUnit | TInt | TBool | TFun of typ * typ | TVar of tvar
+type typ = TUnit | TInt | TBool | TFun of typ * typ | TVar of tvar | TRef of typ
 
 (* represent polymorphic types *)
 type tscheme = Forall of tvar list * typ
@@ -120,6 +120,7 @@ let rec unify subs t1 t2 =
 
   match (t1, t2) with
   | TInt, TInt | TBool, TBool | TUnit, TUnit -> subs
+  | TRef a, TRef b -> unify subs a b
   | TVar a, TVar b when a = b -> subs
   | TVar a, t | t, TVar a -> bind_tvar subs a t
   | TFun (arg1, body1), TFun (arg2, body2) ->
@@ -133,6 +134,28 @@ let rec infer env e =
   | Int _ -> (TInt, empty_sub)
   | Bool _ -> (TBool, empty_sub)
   | Unit -> (TUnit, empty_sub)
+  | Seq (e1, e2) ->
+    let t1, s1 = infer env e1 in
+    let s1' = unify s1 t1 TUnit in
+    let t2, s2 = infer (apply_subs_env s1' env) e2 in
+    let s = compose s2 s1' in
+    (apply_subs s t2, s)
+  | Ref e ->
+    let t, s = infer env e in
+    (TRef (t), s)
+  | Deref e -> (
+    let e', s = infer env e in
+    match e' with
+    | TRef t -> (t, s)
+    | _ -> failwith "Dereferencing non reference type."
+  )
+  | Mutate (e1, e2) ->
+    let t1, s1 = infer env e1 in
+    let t2, s2 = infer (apply_subs_env s1 env) e2 in
+    let a = fresh_tvar () in
+    let s = unify (compose s2 s1) t1 (TRef a) in
+    let s' = unify s t2 a in
+    (TUnit, s')
   | Var x ->
       let scheme = lookup env x in
       let ty = instantiate scheme in
